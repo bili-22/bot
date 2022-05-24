@@ -1,0 +1,52 @@
+{
+    "bot.help": {
+        "type": "Command",
+        "description": "帮助",
+        "group": true,
+        "friend": true,
+        "alias": [
+            "/help"
+        ]
+    },
+    "bot.debug": {
+        "type": "Command",
+        "description": "机器人测试功能",
+        "group": true,
+        "friend": true,
+        "alias": [
+            "/debug"
+        ]
+    },
+    "bot.perm": {
+        "type": "Command",
+        "description": "服和群权限设置",
+        "group": true,
+        "friend": true,
+        "alias": [
+            "/perm"
+        ]
+    },
+    "bot.alias": {
+        "type": "Command",
+        "description": "指令别名设置",
+        "group": true,
+        "friend": false,
+        "alias": [
+            "/alias"
+        ]
+    },
+    "bot.flag": {
+        "type": "Command",
+        "description": "功能开关",
+        "group": true,
+        "friend": false,
+        "alias": [
+            "/flag"
+        ]
+    },
+    "bot.pic": {
+        "type": "Event",
+        "group": true,
+        "description": "@机器人发漫画"
+    }
+}

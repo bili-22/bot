@@ -1,0 +1,9 @@
+{
+	"database": {
+		"host": "abc.com",
+		"user": "root",
+		"password": "1234",
+		"database": "bf1",
+		"port": 1234
+	}
+}

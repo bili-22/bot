@@ -6,6 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/bili-22/bot.git"
@@ -17,7 +18,10 @@
   },
   "homepage": "https://github.com/bili-22/bot#readme",
   "dependencies": {
+    "log4js": "^6.4.7",
+    "mirai-js": "^2.6.1",
     "moment": "^2.29.3",
+    "mysql": "^2.18.1",
     "node-fetch": "^3.2.4",
     "node-schedule": "^2.1.0"
   }
