@@ -1,9 +1,0 @@
-{
-	"default": [
-		"bot.help",
-		"bot.debug",
-		"bot.perm",
-		"bot.flag",
-		"bot.alias"
-	]
-}
