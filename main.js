@@ -38,6 +38,7 @@ if (!fss.existsSync(path.join(__dirname, "data"))) {
     fss.writeFileSync(path.join(__dirname, "data/Alias.json"), "{}")
     fss.writeFileSync(path.join(__dirname, "data/Flag.json"), "{}")
     fss.writeFileSync(path.join(__dirname, "data/Perm.json"), "{}")
+    fss.writeFileSync(path.join(__dirname, "data/Config.json"), "{}")
 }
 if (!fss.existsSync(path.join(__dirname, "config"))) {
     fss.mkdirSync(path.join(__dirname, "config"))
@@ -46,6 +47,9 @@ if (!fss.existsSync(path.join(__dirname, "config"))) {
     fss.writeFileSync(path.join(__dirname, "config/SuperUser.json"), "[]")
     fss.writeFileSync(path.join(__dirname, "config/Template.json"), JSON.stringify({ "default": ["bot.help", "bot.debug", "bot.perm", "bot.flag", "bot.alias", "bot.pic", "bot.bot"] }, "", "\t"))
 }
+
+
+
 
 export const Core = { store: {}, inviteList: [], accounts: {}, bots: {}, groupBotMap: {}, Flag };
 [["Perm", "data/Perm.json"], ["SuperUser", "config/SuperUser.json"], ["Config", "data/Config.json"], ["GroupFlag", "data/Flag.json"], ["Alias", "data/Alias.json"], ["Template", "config/Template.json"]].forEach(config => {
