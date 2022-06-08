@@ -217,5 +217,20 @@ export const Flag = {
             "/map",
             "/换图"
         ]
+    },
+    "bf1rsp.move": {
+        "type": "Command",
+        "description": "换边",
+        "group": true,
+        "friend": false,
+        "alias": [
+            "/move",
+            "/换边"
+        ]
+    },
+    "admin.memberJoin": {
+        "type": "Event",
+        "group": true,
+        "description": "加群通知"
     }
 }

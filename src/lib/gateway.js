@@ -2434,7 +2434,30 @@ Object.defineProperty(setting, "accessToken", {
 
 scheduleJob('0 0 */3 * * *', refreshToken)
 
-async function refreshToken() {
+const pending = {}
+
+function refreshToken() {
+    const name = "token"
+    return new Promise(function (resolve, reject) {
+        if (!pending[name]) {
+            pending[name] = { resolves: [resolve], rejects: [reject] }
+        } else {
+            pending[name].resolves.push(resolve)
+            pending[name].rejects.push(reject)
+            return
+        }
+        refreshTokenFunc()
+            .then(result => {
+                pending[name].resolves.forEach(resolve => resolve(result))
+                delete pending[name]
+            })
+            .catch(error => {
+                pending[name].rejects.forEach(reject => reject(error))
+                delete pending[name]
+            })
+    })
+}
+async function refreshTokenFunc() {
     try {
         const accountInfo = (await db.query(`SELECT * FROM accounts WHERE personaId = ${db.escape(setting.gateway.defaultAccount)}`))[0]
         if (!accountInfo.available) return
@@ -2552,7 +2575,7 @@ export async function updateServerInfo({ gameId, guid, id, serverId } = {}) {
     }
 }
 
-export async function client({ method, params = {}, account }, isRetry) {
+export async function client({ method, params = {}, account, sessionId }, isRetry) {
     const body = { "jsonrpc": "2.0", "method": method, "params": Object.assign(params, { game: "tunguska" }), "id": randomUUID() }
     const init = { body: JSON.stringify(body), method: "POST", headers: { "content-type": "application/json" }, agent }
     if (account) {
@@ -2561,6 +2584,8 @@ export async function client({ method, params = {}, account }, isRetry) {
         if (!account) throw new GatewayError("账号不存在")
         if (!account.available) throw new GatewayError("账号Cookie失效")
         init.headers["X-GatewaySession"] = account.sessionId
+    } else if (sessionId) {
+        init.headers["X-GatewaySession"] = sessionId
     }
     const response = await fetch(baseUrl, init).then(response => response.json()).catch(error => {
         if (error.name === "FetchError") throw new GatewayError("网络连接失败")
@@ -2635,7 +2660,7 @@ class GatewayError extends Error {
                         case "RSP.chooseLevel":
                             return '账号不是管理员'
                         case "RSP.kickPlayer":
-                            return '无法踢出管理员'
+                            return '无法踢出管理员/机器人不是管理员'
                         case "RSP.getServerDetails":
                             return '账号不是管理员'
                         case "Authentication.getEnvIdViaAuthCode":
@@ -2683,6 +2708,8 @@ class GatewayError extends Error {
 
                 if (code === -32856)
                     return '玩家不存在'
+                if (code === -32857 && message === null)
+                    return '服务器不存在/过期'
                 logger.error(`未知的接口错误`, error)
                 return `未知的接口错误`
             }
@@ -2693,7 +2720,28 @@ class GatewayError extends Error {
     }
 }
 
-async function login({ remid, sid }) {
+export function login(obj) {
+    const name = JSON.stringify(obj)
+    return new Promise(function (resolve, reject) {
+        if (!pending[name]) {
+            pending[name] = { resolves: [resolve], rejects: [reject] }
+        } else {
+            pending[name].resolves.push(resolve)
+            pending[name].rejects.push(reject)
+            return
+        }
+        loginFunc(obj)
+            .then(result => {
+                pending[name].resolves.forEach(resolve => resolve(result))
+                delete pending[name]
+            })
+            .catch(error => {
+                pending[name].rejects.forEach(reject => reject(error))
+                delete pending[name]
+            })
+    })
+}
+async function loginFunc({ remid, sid }) {
     if (!remid && !sid) throw new Error("未提供Cookie")
     const Cookie = `${remid ? `remid=${remid};` : ''}${sid ? `sid=${sid};` : ''}`
     let response = await fetch('https://accounts.ea.com/connect/auth?response_type=code&locale=zh_CN&client_id=sparta-backend-as-user-pc&display=junoWeb%2Flogin', {

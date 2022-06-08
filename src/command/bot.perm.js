@@ -28,10 +28,9 @@ export default async function ({ Core, alias, bot, sender, group, command, text,
                     await quote(`群号格式错误`)
                     return
                 }
-                const groupInfo = await Core.getGroupInfo({ groupId: param1[1] })
-                if (groupInfo) {
-                    group = groupInfo.id
-                    bot = groupInfo.bot
+                if (Core.groupBotMap[param1[1]][0]) {
+                    group = param1[1]
+                    bot = Core.bots[Core.groupBotMap[param1[1]][0]]
                 } else {
                     await quote("群不存在或机器人未加入")
                     return

@@ -8,7 +8,6 @@ import * as db from "./src/lib/db.js";
 import { Flag } from './src/flag.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const setting = JSON.parse(fss.readFileSync(path.join(__dirname, "./config/Setting.json")))
 
 const evade = false
 
@@ -46,6 +45,7 @@ if (!fss.existsSync(path.join(__dirname, "config"))) {
     fss.writeFileSync(path.join(__dirname, "config/SuperUser.json"), "[]")
     fss.writeFileSync(path.join(__dirname, "config/Template.json"), JSON.stringify({ "default": ["bot.help", "bot.debug", "bot.perm", "bot.flag", "bot.alias", "bot.pic", "bot.bot"] }, "", "\t"))
 }
+const setting = JSON.parse(fss.readFileSync(path.join(__dirname, "./config/Setting.json")))
 
 export const Core = { store: {}, inviteList: [], accounts: {}, bots: {}, groupBotMap: {}, Flag };
 [["Perm", "data/Perm.json"], ["SuperUser", "config/SuperUser.json"], ["Config", "data/Config.json"], ["GroupFlag", "data/Flag.json"], ["Alias", "data/Alias.json"], ["Template", "config/Template.json"]].forEach(config => {
@@ -98,36 +98,17 @@ async function initBot(bot, config) {
     groupList.forEach(group => Core.groupBotMap[group.id] ? Core.groupBotMap[group.id].push(bot.config.qq) : Core.groupBotMap[group.id] = [bot.config.qq])
     const { nickname } = await bot.getUserProfile({ qq: bot.config.qq })
     bot.nickname = nickname
-    bot.sendFriendMessage = async (qq, message) => {
-        try {
-            if (typeof message === "string") {
-                await bot.sendMessage({
-                    friend: qq,
-                    message: new Message().addText(evade ? message.replace(/(.)/g, "$1\u200b") : message),
-                });
-            }
-            if (Buffer.isBuffer(message)) {
-                const { imageId } = await bot.uploadImage({ img: message });
-                await bot.sendMessage({
-                    friend: qq,
-                    message: new Message().addImageId(imageId),
-                });
-            }
-            logger.info(`${bot.config.qq} SendFriendMessage ${bot.config.qq} ${qq}\n${typeof message === "string" && message || Buffer.isBuffer(message) && "Buffer" || "Other"}`)
-        } catch (error) {
-            logger.error(`${bot.config.qq} SendFriendMessage(错误) ${bot.config.qq} ${qq}\n${typeof message === "string" && message || Buffer.isBuffer(message) && "Buffer" || "Other"}\n`, error)
-        }
-    }
     bot.on('FriendMessage', handleMessage)
     bot.on('GroupMessage', handleMessage)
     bot.on('TempMessage', handleMessage)
     bot.on('NewFriendRequestEvent', new Middleware().friendRequestProcessor().done(handleEvent))
+    bot.on('MemberJoinRequestEvent', new Middleware().memberJoinRequestProcessor().done(handleEvent))
     bot.on('BotInvitedJoinGroupRequestEvent', new Middleware().invitedJoinGroupRequestProcessor().done(handleEvent))
     bot.on('BotOnlineEvent', () => Core.bots[bot.config.qq] = bot)
     bot.on('BotOfflineEventActive', () => delete Core.bots[bot.config.qq])
     bot.on('BotOfflineEventForce', () => delete Core.bots[bot.config.qq])
     bot.on('BotOfflineEventDropped', () => delete Core.bots[bot.config.qq])
-    const events = ['BotReloginEvent', 'BotGroupPermissionChangeEvent', 'BotMuteEvent', 'BotUnmuteEvent', 'BotJoinGroupEvent', 'BotLeaveEventActive', 'BotLeaveEventKick', 'GroupRecallEvent', 'FriendRecallEvent', 'GroupNameChangeEvent', 'GroupEntranceAnnouncementChangeEvent', 'GroupMuteAllEvent', 'GroupAllowAnonymousChatEvent', 'GroupAllowConfessTalkEvent', 'GroupAllowMemberInviteEvent', 'MemberJoinEvent', 'MemberLeaveEventKick', 'MemberLeaveEventQuit', 'MemberCardChangeEvent', 'MemberSpecialTitleChangeEvent', 'MemberPermissionChangeEvent', 'MemberMuteEvent', 'MemberUnmuteEvent', 'MemberJoinRequestEvent']
+    const events = ['BotReloginEvent', 'BotGroupPermissionChangeEvent', 'BotMuteEvent', 'BotUnmuteEvent', 'BotJoinGroupEvent', 'BotLeaveEventActive', 'BotLeaveEventKick', 'GroupRecallEvent', 'FriendRecallEvent', 'GroupNameChangeEvent', 'GroupEntranceAnnouncementChangeEvent', 'GroupMuteAllEvent', 'GroupAllowAnonymousChatEvent', 'GroupAllowConfessTalkEvent', 'GroupAllowMemberInviteEvent', 'MemberLeaveEventKick', 'MemberLeaveEventQuit', 'MemberCardChangeEvent', 'MemberSpecialTitleChangeEvent', 'MemberPermissionChangeEvent', 'MemberMuteEvent', 'MemberUnmuteEvent', 'MemberJoinRequestEvent']
     events.forEach(event => {
         bot.on(event, handleEvent)
     })
@@ -140,20 +121,20 @@ Core.sendGroupMessage = async (group, message, bot) => {
         bot = group ? Core.bots[availableBots[Math.floor((Math.random() * availableBots.length))]] : data.bot
     }
     try {
+        logger.info(`${bot.config.qq} SendGroupMessage ${bot.config.qq} ${group}\n${typeof message === "string" && message || Buffer.isBuffer(message) && "Buffer" || "Other"}`)
         if (typeof message === "string") {
-            await bot.sendMessage({
+            return await bot.sendMessage({
                 group: group,
                 message: new Message().addText(evade ? message.replace(/(.)/g, "$1\u200b") : message),
             });
         }
         if (Buffer.isBuffer(message)) {
             const { imageId } = await bot.uploadImage({ img: message });
-            await bot.sendMessage({
+            return await bot.sendMessage({
                 group: group,
                 message: new Message().addImageId(imageId),
             });
         }
-        logger.info(`${bot.config.qq} SendGroupMessage ${bot.config.qq} ${group}\n${typeof message === "string" && message || Buffer.isBuffer(message) && "Buffer" || "Other"}`)
     } catch (error) {
         if (error.name === "Error" && error.message === "Bot被禁言") {
             logger.warn(`${bot.config.qq} SendGroupMessage(被禁言) ${bot.config.qq} ${group}\n${typeof message === "string" && message || Buffer.isBuffer(message) && "Buffer" || "Other"}`)
@@ -163,7 +144,7 @@ Core.sendGroupMessage = async (group, message, bot) => {
     }
 }
 Core.sendNotice = async function (message) {
-    await Core.sendGroupMessage(setting.notice.group, message)
+    return await Core.sendGroupMessage(setting.notice.group, message)
 }
 
 const sourceIds = []
@@ -208,8 +189,9 @@ async function handleMessage(data) {
         // const availableBots = group ? Core.groupBotMap[group].filter(qq => Core.bots[qq]) : []
         // const bot = availableBots.includes(3492557425) && Core.bots[3492557425] || group ? Core.bots[availableBots[Math.floor((Math.random() * availableBots.length))]] : data.bot
         try {
+            logger.info(`${bot.config.qq} ${data.type} ${group ? `${group} ${sender}\n${data.sender.group.name} ` : `${sender}\n`}${data.sender.memberName || data.sender.nickname || sender}:${text}\n${typeof message === "string" && message || Buffer.isBuffer(message) && "Buffer" || "Other"}`)
             if (typeof message === "string") {
-                await bot.sendMessage({
+                return await bot.sendMessage({
                     temp: data.type === 'TempMessage',
                     friend: (data.type === 'TempMessage' || data.type === 'FriendMessage') && sender,
                     group: (data.type === 'TempMessage' || data.type === 'GroupMessage') && group,
@@ -219,7 +201,7 @@ async function handleMessage(data) {
             }
             if (Buffer.isBuffer(message)) {
                 const { imageId } = await bot.uploadImage({ img: message });
-                await bot.sendMessage({
+                return await bot.sendMessage({
                     temp: data.type === 'TempMessage',
                     friend: (data.type === 'TempMessage' || data.type === 'FriendMessage') && sender,
                     group: (data.type === 'TempMessage' || data.type === 'GroupMessage') && group,
@@ -227,7 +209,6 @@ async function handleMessage(data) {
                     message: new Message().addImageId(imageId),
                 });
             }
-            logger.info(`${bot.config.qq} ${data.type} ${group ? `${group} ${sender}\n${data.sender.group.name} ` : `${sender}\n`}${data.sender.memberName || data.sender.nickname || sender}:${text}\n${typeof message === "string" && message || Buffer.isBuffer(message) && "Buffer" || "Other"}`)
         } catch (error) {
             if (error.name === "Error" && error.message === "Bot被禁言") {
                 logger.warn(`${bot.config.qq} ${data.type}(被禁言) ${group ? `${group} ${sender}\n${data.sender.group.name} ` : `${sender}\n`}${data.sender.memberName || data.sender.nickname || sender}:${text}\n${typeof message === "string" && message || Buffer.isBuffer(message) && "Buffer" || "Other"}`)
@@ -247,6 +228,7 @@ async function handleMessage(data) {
         type: data.type,
         data: data,
         bot: bot,
+        quoteId: data.messageChain[1] && data.messageChain[1].type === 'Quote' && data.messageChain[1].id || null,
         command: command,
         alias: command && (group && Core.Alias[group] && Core.Alias[group][command] ? Core.Alias[group][command][0] : Core.Flag[command].alias[0]),
         aliases: aliases,
