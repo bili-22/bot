@@ -25,6 +25,10 @@ log4js.configure({
     }
 });
 
+const sourceIds = new Set()
+const sendSourceIds = new Set()
+let msgCount = 0
+
 export const getLogger = log4js.getLogger
 const logger = getLogger('default');
 
@@ -77,6 +81,11 @@ void async function () {
         import("./" + path.join("./src/command", filename))
             .then(module => module.default && commandModules.push(module.default))
     })
+    const cmddirC = await fs.readdir(path.join(__dirname, "src/commandC"))
+    cmddirC.forEach(filename => {
+        import("./" + path.join("./src/commandC", filename))
+            .then(module => module.default && commandModules.push(module.default))
+    })
     const eventdir = await fs.readdir(path.join(__dirname, "src/eventhandler"))
     eventdir.forEach(filename => {
         import("./" + path.join("./src/eventhandler", filename))
@@ -108,7 +117,7 @@ async function initBot(bot, config) {
     bot.on('BotOfflineEventActive', () => delete Core.bots[bot.config.qq])
     bot.on('BotOfflineEventForce', () => delete Core.bots[bot.config.qq])
     bot.on('BotOfflineEventDropped', () => delete Core.bots[bot.config.qq])
-    const events = ['BotReloginEvent', 'BotGroupPermissionChangeEvent', 'BotMuteEvent', 'BotUnmuteEvent', 'BotJoinGroupEvent', 'BotLeaveEventActive', 'BotLeaveEventKick', 'GroupRecallEvent', 'FriendRecallEvent', 'GroupNameChangeEvent', 'GroupEntranceAnnouncementChangeEvent', 'GroupMuteAllEvent', 'GroupAllowAnonymousChatEvent', 'GroupAllowConfessTalkEvent', 'GroupAllowMemberInviteEvent', 'MemberLeaveEventKick', 'MemberLeaveEventQuit', 'MemberCardChangeEvent', 'MemberSpecialTitleChangeEvent', 'MemberPermissionChangeEvent', 'MemberMuteEvent', 'MemberUnmuteEvent', 'MemberJoinRequestEvent']
+    const events = ['BotReloginEvent', 'BotGroupPermissionChangeEvent', 'BotMuteEvent', 'BotUnmuteEvent', 'BotJoinGroupEvent', 'BotLeaveEventActive', 'BotLeaveEventKick', 'GroupRecallEvent', 'FriendRecallEvent', 'GroupNameChangeEvent', 'GroupEntranceAnnouncementChangeEvent', 'GroupMuteAllEvent', 'GroupAllowAnonymousChatEvent', 'GroupAllowConfessTalkEvent', 'GroupAllowMemberInviteEvent', 'MemberLeaveEventKick', 'MemberLeaveEventQuit', 'MemberCardChangeEvent', 'MemberSpecialTitleChangeEvent', 'MemberPermissionChangeEvent', 'MemberMuteEvent', 'MemberUnmuteEvent', 'MemberJoinEvent']
     events.forEach(event => {
         bot.on(event, handleEvent)
     })
@@ -117,37 +126,41 @@ async function initBot(bot, config) {
 
 Core.sendGroupMessage = async (group, message, bot) => {
     if (!bot) {
-        const availableBots = group ? Core.groupBotMap[group].filter(qq => Core.bots[qq]) : []
-        bot = group ? Core.bots[availableBots[Math.floor((Math.random() * availableBots.length))]] : data.bot
+        const availableBots = group && Core.groupBotMap[group] ? Core.groupBotMap[group].filter(qq => Core.bots[qq]) : []
+        if (!availableBots.length) {
+            return
+        }
+        bot = Core.bots[availableBots[Math.floor((Math.random() * availableBots.length))]]
     }
     try {
-        logger.info(`${bot.config.qq} SendGroupMessage ${bot.config.qq} ${group}\n${typeof message === "string" && message || Buffer.isBuffer(message) && "Buffer" || "Other"}`)
+        let messageId
         if (typeof message === "string") {
-            return await bot.sendMessage({
+            messageId = await bot.sendMessage({
                 group: group,
                 message: new Message().addText(evade ? message.replace(/(.)/g, "$1\u200b") : message),
             });
         }
         if (Buffer.isBuffer(message)) {
             const { imageId } = await bot.uploadImage({ img: message });
-            return await bot.sendMessage({
+            messageId = await bot.sendMessage({
                 group: group,
                 message: new Message().addImageId(imageId),
             });
         }
+        logger.info(`${bot.config.qq} SendGroupMessage ${group}\n${typeof message === "string" && message || Buffer.isBuffer(message) && "Buffer" || "Other"}`)
+        sendSourceIds.add(messageId)
+        return messageId
     } catch (error) {
         if (error.name === "Error" && error.message === "Bot被禁言") {
             logger.warn(`${bot.config.qq} SendGroupMessage(被禁言) ${bot.config.qq} ${group}\n${typeof message === "string" && message || Buffer.isBuffer(message) && "Buffer" || "Other"}`)
             return
         }
-        logger.error(`${bot.config.qq} SendGroupMessage(错误) ${bot.config.qq} ${group}\n${typeof message === "string" && message || Buffer.isBuffer(message) && "Buffer" || "Other"}\n`, error)
+        throw error
     }
 }
 Core.sendNotice = async function (message) {
     return await Core.sendGroupMessage(setting.notice.group, message)
 }
-
-const sourceIds = []
 
 async function handleEvent(data) {
     Promise.all(eventHandlers.map(handlerEvent => handlerEvent({
@@ -164,14 +177,19 @@ async function handleEvent(data) {
 }
 
 async function handleMessage(data) {
+    msgCount++
     const sender = data.sender.id
-    const group = data.sender.group && data.sender.group.id
+    const group = data.sender.group && data.sender.group.id || null
     const bot = data.bot
+    if (group && !Core.groupBotMap[group]) {
+        Core.groupBotMap[group] = [bot.config.qq]
+    } else if (group && !Core.groupBotMap[group].includes(bot.config.qq)) {
+        Core.groupBotMap[group].push(bot.config.qq)
+    }
     if (sender in Core.bots) return
-    if (group && Core.Config[group] && Core.Config[group].bot && Core.bots[Core.Config[group].bot] && bot !== Core.bots[Core.Config[group].bot]) return
-    if (sourceIds.includes(data.messageChain[0].id)) return
-    sourceIds.unshift(data.messageChain[0].id)
-    if (sourceIds.length > 1000) sourceIds.length = 500
+    // if (group && Core.Config[group] && Core.Config[group].bot && Core.bots[Core.Config[group].bot] && bot !== Core.bots[Core.Config[group].bot]) return
+    if (sourceIds.has(data.messageChain[0].id)) return
+    sourceIds.add(data.messageChain[0].id)
     const groupName = data.sender.group && data.sender.group.name
     const selfPermLevel = data.sender.group && (data.sender.group.permission === "OWNER" && 2 || data.sender.group.permission === "ADMIN" && 1 || 0)
     const text = data.messageChain.map(message => {
@@ -186,12 +204,13 @@ async function handleMessage(data) {
     }).join("")
     logger.trace(data.type, sender + (group || ""), JSON.stringify(data.messageChain))
     const sendMessage = async (message, isQuote) => {
+
         // const availableBots = group ? Core.groupBotMap[group].filter(qq => Core.bots[qq]) : []
         // const bot = availableBots.includes(3492557425) && Core.bots[3492557425] || group ? Core.bots[availableBots[Math.floor((Math.random() * availableBots.length))]] : data.bot
         try {
-            logger.info(`${bot.config.qq} ${data.type} ${group ? `${group} ${sender}\n${data.sender.group.name} ` : `${sender}\n`}${data.sender.memberName || data.sender.nickname || sender}:${text}\n${typeof message === "string" && message || Buffer.isBuffer(message) && "Buffer" || "Other"}`)
+            let messageId
             if (typeof message === "string") {
-                return await bot.sendMessage({
+                messageId = await bot.sendMessage({
                     temp: data.type === 'TempMessage',
                     friend: (data.type === 'TempMessage' || data.type === 'FriendMessage') && sender,
                     group: (data.type === 'TempMessage' || data.type === 'GroupMessage') && group,
@@ -201,7 +220,7 @@ async function handleMessage(data) {
             }
             if (Buffer.isBuffer(message)) {
                 const { imageId } = await bot.uploadImage({ img: message });
-                return await bot.sendMessage({
+                messageId = await bot.sendMessage({
                     temp: data.type === 'TempMessage',
                     friend: (data.type === 'TempMessage' || data.type === 'FriendMessage') && sender,
                     group: (data.type === 'TempMessage' || data.type === 'GroupMessage') && group,
@@ -209,6 +228,9 @@ async function handleMessage(data) {
                     message: new Message().addImageId(imageId),
                 });
             }
+            logger.info(`${bot.config.qq} ${data.type} ${group ? `${group} ${sender}\n${data.sender.group.name} ` : `${sender}\n`}${data.sender.memberName || data.sender.nickname || sender}:${text}\n${typeof message === "string" && message || Buffer.isBuffer(message) && "Buffer" || "Other"}`)
+            sendSourceIds.add(messageId)
+            return messageId
         } catch (error) {
             if (error.name === "Error" && error.message === "Bot被禁言") {
                 logger.warn(`${bot.config.qq} ${data.type}(被禁言) ${group ? `${group} ${sender}\n${data.sender.group.name} ` : `${sender}\n`}${data.sender.memberName || data.sender.nickname || sender}:${text}\n${typeof message === "string" && message || Buffer.isBuffer(message) && "Buffer" || "Other"}`)
@@ -231,12 +253,14 @@ async function handleMessage(data) {
         quoteId: data.messageChain[1] && data.messageChain[1].type === 'Quote' && data.messageChain[1].id || null,
         command: command,
         alias: command && (group && Core.Alias[group] && Core.Alias[group][command] ? Core.Alias[group][command][0] : Core.Flag[command].alias[0]),
-        aliases: aliases,
+        aliases,
         sender: sender,
         group: group,
         groupName: groupName,
         messageChain: data.messageChain,
+        botInfo: { msgCount, sourceIds, sendSourceIds },
         text: text,
+        recall: async messageId => await bot.recall({ messageId }),
         groupPermLevel: group && (data.sender.permission === "OWNER" && 2 || data.sender.permission === "ADMIN" && 1 || 0),
         botPermLevel: Core.SuperUser.includes(sender) && 4 || group && (Core.Perm[group] && Core.Perm[group][sender] || 0),
         selfPermLevel: selfPermLevel,

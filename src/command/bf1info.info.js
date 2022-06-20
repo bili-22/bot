@@ -21,19 +21,19 @@ export default async function ({ alias, command, text, quote }) {
     }
     const id = text.replace(/^.*?\s+/, "")
     if (id.match(/^#[0-9]{1,4}$/)) { //编号
-        const servers = await db.query(`SELECT name, id, guid, serverId, gameId, serverBookmarkCount, UNIX_TIMESTAMP(createdDate) createdDate, UNIX_TIMESTAMP(expirationDate) expirationDate FROM servers WHERE id = ${db.escape(id.substr(1))}`)
+        const servers = await db.query(`SELECT g.name as rname, g.group_name as gname, s.name as name, id, s.guid as guid, serverId, gameId, serverBookmarkCount, UNIX_TIMESTAMP(createdDate) createdDate, UNIX_TIMESTAMP(expirationDate) expirationDate FROM servers s LEFT JOIN group_servers g ON g.guid = s.guid WHERE id = ${db.escape(id.substr(1))}`)
         if (servers.length) {
             await serverInfo(servers[0])
             return
         }
     } else if (id.match(/^[0-9]{13,14}$/)) { //GameId
-        const servers = await db.query(`SELECT name, id, guid, serverId, gameId, serverBookmarkCount, UNIX_TIMESTAMP(createdDate) createdDate, UNIX_TIMESTAMP(expirationDate) expirationDate FROM servers WHERE gameId = ${db.escape(id)}`)
+        const servers = await db.query(`SELECT g.name as rname, g.group_name as gname, s.name as name, id, s.guid as guid, serverId, gameId, serverBookmarkCount, UNIX_TIMESTAMP(createdDate) createdDate, UNIX_TIMESTAMP(expirationDate) expirationDate FROM servers s LEFT JOIN group_servers g ON g.guid = s.guid WHERE gameId = ${db.escape(id)}`)
         if (servers.length) {
             await serverInfo(servers[0])
             return
         }
     } else if (id.match(/^[0-9]{5,8}$/)) { //ServerId
-        const servers = await db.query(`SELECT name, id, guid, serverId, gameId, serverBookmarkCount, UNIX_TIMESTAMP(createdDate) createdDate, UNIX_TIMESTAMP(expirationDate) expirationDate FROM servers WHERE serverId = ${db.escape(id)}`)
+        const servers = await db.query(`SELECT g.name as rname, g.group_name as gname, s.name as name, id, s.guid as guid, serverId, gameId, serverBookmarkCount, UNIX_TIMESTAMP(createdDate) createdDate, UNIX_TIMESTAMP(expirationDate) expirationDate FROM servers s LEFT JOIN group_servers g ON g.guid = s.guid WHERE serverId = ${db.escape(id)}`)
         if (servers.length) {
             await serverInfo(servers[0])
             return
@@ -50,7 +50,7 @@ export default async function ({ alias, command, text, quote }) {
             }
         }
     } else if (id.match(/^[A-Za-z0-9]{8}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{12}$/)) { //两种Guid
-        const servers = await db.query(`SELECT name, id, guid, serverId, gameId, serverBookmarkCount, UNIX_TIMESTAMP(createdDate) createdDate, UNIX_TIMESTAMP(expirationDate) expirationDate FROM servers WHERE guid = ${db.escape(id)}`)
+        const servers = await db.query(`SELECT g.name as rname, g.group_name as gname, s.name as name, id, s.guid as guid, serverId, gameId, serverBookmarkCount, UNIX_TIMESTAMP(createdDate) createdDate, UNIX_TIMESTAMP(expirationDate) expirationDate FROM servers s LEFT JOIN group_servers g ON g.guid = s.guid WHERE s.guid = ${db.escape(id)}`)
         if (servers.length) {
             await serverInfo(servers[0])
             return
@@ -100,6 +100,7 @@ export default async function ({ alias, command, text, quote }) {
             `服务器信息`
             + `\n名称:${server.name}`
             + `\nGuid:${server.guid}`
+            + (server.gname ? `\n注册名:${server.rname}    群组:${server.gname}` : "")
             + (isExpired ? `` : `\nGameId:${server.gameId}`)
             + `\nServerId:${server.serverId}`
             + (isExpired ? `\n` : `\n编号:#${server.id}    `)

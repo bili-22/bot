@@ -2417,7 +2417,12 @@ const s2tTable = {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const setting = JSON.parse(fs.readFileSync(path.join(__dirname, "../../config/Setting.json")))
-const agent = new Agent({ proxy: setting.gateway.proxy && setting.gateway.proxy.host && setting.gateway.proxy })
+const agent = new Agent({
+    // "proxy": {
+    // "hostname": "10.10.10.4",
+    // "port": 3080
+    // }
+})
 const baseUrl = setting.gateway.baseUrl
 const logger = getLogger("gateway")
 Object.defineProperty(setting, "accessToken", {
@@ -2431,6 +2436,11 @@ Object.defineProperty(setting, "accessToken", {
         return String(value)
     }
 })
+
+// async function getIp() {
+//     const ip = await fetch("https://ifconfig.me/", { agent, headers: { Accept: "application/json" } }).then(response => response.text())
+//     return ip
+// }
 
 scheduleJob('0 0 */3 * * *', refreshToken)
 
@@ -2490,7 +2500,7 @@ export async function checkPerm(server, qq, group) {
     return result[1] ? Object.assign({ admin: true }, result[0]) : result[0] ? Object.assign({ admin: false }, result[0]) : null
 }
 
-export async function searchPlayer({ name, personaId, userId } = {}) {
+export async function searchPlayer({ name, personaId, userId } = {}, callback) {
     if (!name && !personaId && !userId) return null
     if (name && name.substr(0, 1) === "#") {
         personaId = name.substr(1)
@@ -2498,8 +2508,8 @@ export async function searchPlayer({ name, personaId, userId } = {}) {
     }
     const result = await db.query(`SELECT * FROM players WHERE ${name && "name" || personaId && "personaId" || userId && "userId"} = ${db.escape(name || personaId || userId)} ORDER BY updateAt DESC`)
     if (result[0]) {
-        if (name) getInfoByName(name).catch(error => logger.error(error))
-        if (!name && personaId) getInfoByPID(personaId).catch(error => logger.error(error))
+        if (name) getInfoByName(name).then(persona => { if (typeof callback === "function" && (result[0].personaId !== persona.personaId || result[0].name.toLowerCase() !== persona.name.toLowerCase())) callback(persona) }).catch(error => logger.error(error))
+        if (!name && personaId) getInfoByPID(personaId).then(persona => { if (typeof callback === "function" && result[0].name.toLowerCase() !== persona.name.toLowerCase()) callback(persona) }).catch(error => logger.error(error))
         return { name: result[0].name, personaId: result[0].personaId, userId: result[0].userId }
     } else if (name) {
         return await getInfoByName(name)
@@ -2518,7 +2528,10 @@ export async function searchPlayer({ name, personaId, userId } = {}) {
                 "X-Expand-Results": true,
                 "Authorization": "Bearer " + token
             }
-        }).then(result => result.json())
+        }).then(result => result.json()).catch(error => {
+            if (error.name === "FetchError") throw new GatewayError("网络连接失败")
+            throw error
+        })
         if (result.error == "invalid_access_token") {
             const accessToken = await refreshToken() || null
             if (!accessToken || isRetry) throw new GatewayError("OriginAccessToken过期")
@@ -2571,7 +2584,6 @@ export async function updateServerInfo({ gameId, guid, id, serverId } = {}) {
         await db.query(sql)
     } catch (error) {
         logger.error("更新服务器", error)
-        throw error
     }
 }
 
@@ -2587,7 +2599,10 @@ export async function client({ method, params = {}, account, sessionId }, isRetr
     } else if (sessionId) {
         init.headers["X-GatewaySession"] = sessionId
     }
-    const response = await fetch(baseUrl, init).then(response => response.json()).catch(error => {
+    const response = await fetch(baseUrl, init).then(response => response.json().catch(error => {
+        if (error.name === "SyntaxError" && error.message.match("Unexpected token")) return response.text().then(text => ({ error: { message: text, code: 0 } }))
+        throw error
+    })).catch(error => {
         if (error.name === "FetchError") throw new GatewayError("网络连接失败")
         throw error
     })
@@ -2637,6 +2652,8 @@ class GatewayError extends Error {
 
                 if (code === -34501)
                     return '找不到服务器'
+                if (code === -34504)
+                    return '连接超时(后端)'
 
                 if (code === -32601)
                     return '方法不存在'
@@ -2701,15 +2718,21 @@ class GatewayError extends Error {
                     return '服务器未开启'
                 if (message === "RspErrServerBanMax()")
                     return '服务器Ban已满'
+                if (message === "RspErrServerVipMax()")
+                    return '服务器VIP已满'
                 if (message === "InvalidLevelIndexException")
                     return '地图编号无效'
+                if (message === "RspErrUserIsAlreadyVip()")
+                    return '玩家已经是VIP了'
                 if (message === "InvalidServerIdException") //-32855
                     return '服务器ID不存在'
 
+                if (code === -32851)
+                    return '服务器不存在/已过期'
                 if (code === -32856)
                     return '玩家不存在'
-                if (code === -32857 && message === null)
-                    return '服务器不存在/过期'
+                if (code === -32857)
+                    return '无法处置管理员'
                 logger.error(`未知的接口错误`, error)
                 return `未知的接口错误`
             }

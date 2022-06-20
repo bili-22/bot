@@ -21,7 +21,7 @@ export default async function ({ Core, alias, flag, group, command, text, quote 
         await quote(Object.keys(flagList)
             .filter(category => flagList[category].filter(item => !flag || flag.includes(item)).length)
             .map(category => `${category}:${descriptions[category] || "无"}`).join("\n")
-            + `\n请使用[${alias} 功能名]以查看介绍\n捐赠:https://afdian.net/@bilibili22`
+            + `\n请使用[${alias} 功能名]以查看介绍`
         )
     } else {
         if (!flagList[category]) {
@@ -33,9 +33,8 @@ export default async function ({ Core, alias, flag, group, command, text, quote 
             return
         }
         await quote(flagList[category]
-            .filter(flag => Core.Flag[flag].type === "Command")
             .filter(item => !flag || flag.includes(item))
-            .map(flag => `${group && Core.Alias[group] && Core.Alias[group][flag] ? Core.Alias[group][flag][0] : Core.Flag[flag].alias[0]} ${Core.Flag[flag].description || "无帮助信息"}`)
+            .map(flag => Core.Flag[flag].type === "Command" ? `${group && Core.Alias[group] && Core.Alias[group][flag] ? Core.Alias[group][flag][0] : Core.Flag[flag].alias[0]} ${Core.Flag[flag].description || "无帮助信息"}` : `[${flag}] ${Core.Flag[flag].description}`)
             .join("\n") + `\n请使用[指令 help]以查看使用方法`
         )
     }

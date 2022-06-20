@@ -28,7 +28,7 @@ export default async function ({ Core, alias, bot, sender, group, command, text,
                     await quote(`群号格式错误`)
                     return
                 }
-                if (Core.groupBotMap[param1[1]][0]) {
+                if (Core.groupBotMap[param1[1]]) {
                     group = param1[1]
                     bot = Core.bots[Core.groupBotMap[param1[1]][0]]
                 } else {

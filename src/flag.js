@@ -59,6 +59,22 @@ export const Flag = {
             "/bot"
         ]
     },
+    "bot.donate": {
+        "type": "Command",
+        "group": true,
+        "friend": true,
+        "description": "捐赠信息",
+        "alias": [
+            "/捐赠",
+            "/donate"
+        ]
+    },
+    "bot.emojiMix": {
+        "type": "Event",
+        "group": true,
+        "friend": false,
+        "description": "🥰+🤤"
+    },
     "bf1info.stat": {
         "type": "Command",
         "description": "BF1战绩查询",
@@ -226,6 +242,52 @@ export const Flag = {
         "alias": [
             "/move",
             "/换边"
+        ]
+    },
+    "bf1rsp.playerList": {
+        "type": "Command",
+        "description": "获取服务器玩家列表",
+        "group": true,
+        "friend": false,
+        "alias": [
+            "/playerlist",
+            "/玩家"
+        ]
+    },
+    "bf1rsp.vip": {
+        "type": "Command",
+        "description": "上VIP",
+        "group": true,
+        "friend": false,
+        "alias": [
+            "/vip"
+        ]
+    },
+    "bf1rsp.unvip": {
+        "type": "Command",
+        "description": "下VIP",
+        "group": true,
+        "friend": false,
+        "alias": [
+            "/unvip"
+        ]
+    },
+    "bf1rsp.vipCheck": {
+        "type": "Command",
+        "description": "检查VIP(行动)",
+        "group": true,
+        "friend": false,
+        "alias": [
+            "/checkvip"
+        ]
+    },
+    "bf1rsp.vipList": {
+        "type": "Command",
+        "description": "获取VIP列表",
+        "group": true,
+        "friend": false,
+        "alias": [
+            "/viplist"
         ]
     },
     "admin.memberJoin": {

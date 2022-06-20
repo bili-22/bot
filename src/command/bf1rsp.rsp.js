@@ -60,10 +60,11 @@ export default async function ({ alias, type, command, text, quote, botPermLevel
     }
     if (params[1].toLowerCase() === "status") {
         if (!params[2]) {
-            const accountList = await db.query(`SELECT p.name as name, p.personaId as personaId FROM accounts a LEFT JOIN players p ON a.personaId = p.personaId WHERE admin = 1`)
+            const accountList = await db.query(`SELECT p.name as name, p.personaId as personaId, sessionId FROM accounts a LEFT JOIN players p ON a.personaId = p.personaId WHERE admin = 1`)
             const countList = await db.query(`SELECT personaId, COUNT(a.guid) as count FROM server_admins a LEFT JOIN servers s ON a.guid = s.guid WHERE expirationDate > CURRENT_TIMESTAMP AND personaId IN (${accountList.map(i => i.personaId).join(", ")}) GROUP BY personaId`)
+            await Promise.all(accountList.map((a, i) => client({ method: "Companion.isLoggedIn", sessionId: a.sessionId }).then(result => accountList[i].isLoggedIn = result.isLoggedIn)))
             const counts = Object.fromEntries(countList.map(item => [item.personaId, item.count]))
-            await quote(accountList.sort((a, b) => a.name.localeCompare(b.name)).map(item => `${item.name}(${counts[item.personaId] || 0})`).join("\n"))
+            await quote(accountList.sort((a, b) => a.name.localeCompare(b.name)).map(item => `${item.name}${item.isLoggedIn ? "" : "*"}(${counts[item.personaId] || 0})`).join("\n"))
             return
         } else {
             const result = await db.query(`SELECT p.name as pname, s.name as name, expirationDate < CURRENT_TIMESTAMP as isExpired, id FROM (accounts a LEFT JOIN (server_admins sa LEFT JOIN servers s ON sa.guid = s.guid) ON a.personaId = sa.personaId) LEFT JOIN players p ON a.personaId = p.personaId WHERE admin = 1 AND p.name = ${db.escape(params[2])}`)
@@ -86,7 +87,7 @@ export default async function ({ alias, type, command, text, quote, botPermLevel
         }
     }
     const groupName = group.name
-    const servers = await db.query(`SELECT g.name as name, s.name as serverName, g.guid as guid, id, expirationDate < CURRENT_TIMESTAMP isExpired FROM group_servers g LEFT JOIN servers s ON g.guid = s.guid WHERE g.group_name = ${db.escape(groupName)}`)
+    const servers = await db.query(`SELECT g.name as name, s.name as serverName, g.guid as guid, p.name as account, id, expirationDate < CURRENT_TIMESTAMP isExpired FROM (group_servers g LEFT JOIN players p ON g.account_id = p.personaId) LEFT JOIN servers s ON g.guid = s.guid WHERE g.group_name = ${db.escape(groupName)}`)
     switch (params[2].toLowerCase()) {
         case "info": {
             await quote(
@@ -98,9 +99,8 @@ export default async function ({ alias, type, command, text, quote, botPermLevel
         }
         case "list": {
             await quote(servers.sort((a, b) => a.name.localeCompare(b.name)).map(server => {
-                return `${server.serverName.slice(0, 20)}${server.id ? " #" + server.id : ""}${server.isExpired ? "(过期)" : ""}`
-                    + `\nGuid:${server.guid}`
-                    + `\n名称:${server.name}  群组:${groupName}`
+                return `${server.serverName.slice(0, 20)}${server.id ? " #" + server.id : " " + server.guid}${server.isExpired ? "(过期)" : ""}`
+                    + `\n名称:${server.name}  账号:${server.account}`
             }).join("\n") || "无服务器")
             return
         }
@@ -110,6 +110,10 @@ export default async function ({ alias, type, command, text, quote, botPermLevel
                 return
             }
             const name = params[3].toLowerCase()
+            if (name.length < 3) {
+                await quote(`服务器名称过短`)
+                return
+            }
             const id = params[4]
             let guid, gameId
             if (id.match(/^#[0-9]{1,4}$/)) {
@@ -118,7 +122,13 @@ export default async function ({ alias, type, command, text, quote, botPermLevel
                     await quote(`服务器不存在`)
                     return
                 }
-            } else if (!id.match(/^[A-Za-z0-9]{8}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{12}$/)) {
+            } else if (id.match(/^[A-Za-z0-9]{8}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{12}$/)) {
+                await db.query(`SELECT guid, gameId FROM servers WHERE guid = ${db.escape(id)}`).then(result => result[0] && (guid = result[0].guid, gameId = result[0].gameId))
+                if (!guid || !gameId) {
+                    await quote(`服务器不存在`)
+                    return
+                }
+            } else {
                 await quote(`编号格式错误`)
                 return
             }

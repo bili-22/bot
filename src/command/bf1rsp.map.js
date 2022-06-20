@@ -48,7 +48,7 @@ export default async function ({ alias, command, sender, group, text, quote }) {
         })
         if (Math.floor(mapId) == mapId && mapId >= 0 && mapId < rotation.length) {
             await client({ method: "RSP.chooseLevel", account, params: { persistedGameId: guid, levelIndex: +mapId } })
-            await quote('地图由 ' + fullServerDetail.serverInfo.mapNamePretty + ' 更换至 ' + rotation[+mapId].mapPrettyName)
+            await quote('地图更换至 ' + rotation[+mapId].mapPrettyName)
             return
         }
         if (mapId == '重开') {

@@ -1,7 +1,7 @@
 export default async function ({ Core, alias, flag, group, command, text, quote, botPermLevel }) {
     if (command !== "bot.flag") return
-    if (botPermLevel < 4) {
-        await quote("该指令需要超级管理员权限")
+    if (botPermLevel < 1) {
+        await quote("该指令需要管理员权限")
         return
     }
     const params = text.split(/\s+/)

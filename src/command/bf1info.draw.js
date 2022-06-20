@@ -20,7 +20,7 @@ function dateToText(date) {
 
 export default async function ({ alias, command, text, quote }) {
     if (command !== "bf1info.draw") return
-    const help = `${alias} <#编号> [日期] [时间(小时)]`
+    const help = `${alias} <服务器/#编号> [日期] [时间(小时)]`
     const params = text.split(/\s+/)
     let isRgb = false
     if (params.slice(-1)[0] === "-rgb") {
@@ -42,13 +42,9 @@ export default async function ({ alias, command, text, quote }) {
         await quote(fullHelp)
         return
     }
-    if (!params[1].match(/^#[0-9]{1,4}$/)) {
-        await quote(`编号格式错误`)
-        return
-    }
-    const servers = await db.query(`SELECT guid, name FROM servers WHERE id = ${db.escape(+params[1].substr(1))}`)
+    const servers = await db.query(`SELECT s.guid as guid, s.name as name FROM servers s LEFT JOIN group_servers g ON s.guid = g.guid WHERE ${params[1].match(/^#[0-9]{1,4}$/) ? `id = ${db.escape(+params[1].substr(1))}` : `g.name = ${db.escape(params[1].toLowerCase())}`}`)
     if (!servers.length) {
-        await quote(`编号不存在`)
+        await quote(params[1].match(/^#[0-9]{1,4}$/) ? `编号不存在` : `服务器不存在`)
         return
     }
     const { guid, name } = servers[0]
