@@ -294,5 +294,10 @@ export const Flag = {
         "type": "Event",
         "group": true,
         "description": "加群通知"
+    },
+    "admin.memberCard": {
+        "type": "Event",
+        "group": true,
+        "description": "加群自动改ID"
     }
 }
