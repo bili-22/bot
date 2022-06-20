@@ -9,8 +9,6 @@ import { Flag } from './src/flag.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const evade = false
-
 log4js.configure({
     "appenders": {
         "console": { "type": "stdout" },
@@ -139,9 +137,16 @@ Core.sendGroupMessage = async (group, message, bot) => {
     try {
         let messageId
         if (typeof message === "string") {
+            const msg = new Message()
+            const texts = message.split(/\[\[@[0-9]+\]\]/g)
+            const ats = (message.match(/\[\[@[0-9]+\]\]/g) || []).map(t => +t.replace(/\[\[@([0-9]+)\]\]/, '$1'))
+            texts.forEach((text, index) => {
+                msg.addText(text)
+                if (ats[index]) msg.addAt(ats[index])
+            })
             messageId = await bot.sendMessage({
                 group: group,
-                message: new Message().addText(evade ? message.replace(/(.)/g, "$1\u200b") : message),
+                message: msg,
             });
         }
         if (Buffer.isBuffer(message)) {
@@ -214,12 +219,19 @@ async function handleMessage(data) {
         try {
             let messageId
             if (typeof message === "string") {
+                const msg = new Message()
+                const texts = message.split(/\[\[@[0-9]+\]\]/g)
+                const ats = (message.match(/\[\[@[0-9]+\]\]/g) || []).map(t => +t.replace(/\[\[@([0-9]+)\]\]/, '$1'))
+                texts.forEach((text, index) => {
+                    msg.addText(text)
+                    if (ats[index]) msg.addAt(ats[index])
+                })
                 messageId = await bot.sendMessage({
                     temp: data.type === 'TempMessage',
                     friend: (data.type === 'TempMessage' || data.type === 'FriendMessage') && sender,
                     group: (data.type === 'TempMessage' || data.type === 'GroupMessage') && group,
                     quote: isQuote && data.messageChain[0].id,
-                    message: new Message().addText(evade ? message.replace(/(.)/g, "$1\u200b") : message),
+                    message: msg,
                 });
             }
             if (Buffer.isBuffer(message)) {
